@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Image → Color Palette</title>
+<style>
+  :root{
+    --bg:#0f1724;
+    --card:#0b1220;
+    --muted:#9aa5b1;
+    --accent:#7dd3fc;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background:linear-gradient(180deg,#071427 0%, #0f1724 100%);
+    color:#e6eef6;
+    padding:28px;
+    min-height:100vh;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+  }
+
+  .app{
+    width:100%;
+    max-width:980px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
+    border-radius:12px;
+    padding:18px;
+    box-shadow: 0 8px 40px rgba(2,6,23,0.6);
+    display:grid;
+    gap:16px;
+    grid-template-columns: 1fr 360px;
+  }
+
+  header{
+    grid-column:1 / -1;
+    display:flex;
+    gap:12px;
+    align-items:center;
+    justify-content:space-between;
+  }
+  header h1{margin:0;font-size:18px}
+  header p{margin:0;color:var(--muted);font-size:13px}
+
+  /* Left: uploader + controls + canvas preview */
+  .left{
+    padding:12px;
+  }
+  .uploader{
+    border:2px dashed rgba(255,255,255,0.06);
+    padding:18px;
+    border-radius:10px;
+    display:flex;
+    gap:12px;
+    align-items:center;
+    background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+  }
+  .dropzone{
+    flex:1;
+    min-height:120px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap:8px;
+    text-align:center;
+    color:var(--muted);
+    cursor:pointer;
+  }
+  .controls{
+    margin-top:12px;
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+  .controls label{color:var(--muted);font-size:13px}
+  input[type=range]{width:160px}
+  button{
+    background:linear-gradient(180deg,var(--accent),#38bdf8);
+    border:none;
+    color:#04202a;
+    padding:8px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+  }
+  .btn-ghost{
+    background:transparent;
+    border:1px solid rgba(255,255,255,0.06);
+    color:var(--muted);
+  }
+
+  .preview{
+    margin-top:12px;
+    border-radius:8px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,0.03);
+    background:#071022;
+    display:flex;
+    gap:12px;
+    padding:12px;
+    align-items:center;
+  }
+  .preview img{
+    max-width:180px;
+    max-height:160px;
+    object-fit:cover;
+    border-radius:6px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.6);
+  }
+  .meta{color:var(--muted);font-size:13px}
+
+  /* Right: palette */
+  .right{
+    padding:12px;
+    border-left:1px solid rgba(255,255,255,0.02);
+  }
+  .palette{
+    display:grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap:10px;
+  }
+  .swatch{
+    height:64px;
+    border-radius:8px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px;
+    color:rgba(0,0,0,0.8);
+    font-weight:700;
+    cursor:pointer;
+    user-select:none;
+  }
+  .swatch .label{
+    font-size:13px;
+    color:rgba(0,0,0,0.65);
+    text-shadow: none;
+  }
+  .swatch small{
+    background:rgba(255,255,255,0.12);
+    padding:4px 8px;
+    border-radius:8px;
+    font-weight:600;
+    font-size:12px;
+    color:#041214;
+  }
+
+  .actions{display:flex;gap:8px;margin-top:12px}
+  .note{color:var(--muted);font-size:12px;margin-top:8px}
+
+  /* Responsive */
+  @media (max-width:880px){
+    .app{grid-template-columns: 1fr; padding:12px}
+    .right{border-left:none;border-top:1px solid rgba(255,255,255,0.02)}
+  }
+</style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="Image to color palette app">
+    <header>
+      <div>
+        <h1>Image → Color Palette</h1>
+        <p>Upload an image, pick how many colors, and extract a clean palette. Click a swatch to copy hex.</p>
+      </div>
+      <div>
+        <small style="color:var(--muted)">Pure HTML • CSS • JS — no libs</small>
+      </div>
+    </header>
+
+    <section class="left" aria-label="uploader and preview">
+      <div class="uploader">
+        <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Drop image or click to upload">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 15v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 8 12 3 8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div style="font-weight:700">Drop image here or click to upload</div>
+          <div style="font-size:13px;color:var(--muted)">PNG, JPG, GIF — up to 10MB</div>
+          <input id="file" accept="image/*" type="file" style="display:none" />
+        </div>
+      </div>
+
+      <div class="controls" role="region" aria-label="controls">
+        <label for="count">Colors:</label>
+        <input id="count" type="range" min="2" max="12" value="6" />
+        <span id="countVal" style="min-width:34px;text-align:center;font-weight:700">6</span>
+        <button id="extract">Extract</button>
+        <button id="clear" class="btn-ghost">Clear</button>
+      </div>
+
+      <div class="preview" aria-live="polite">
+        <img id="previewImg" alt="Image preview" src="" style="display:none" />
+        <div class="meta">
+          <div id="info">No image loaded</div>
+          <div class="note">Tip: use large images for better palettes. The algorithm samples pixels and buckets similar colors.</div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="right" aria-label="palette">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <strong>Palette</strong>
+          <div style="color:var(--muted);font-size:13px">Click a swatch to copy hex</div>
+        </div>
+        <div style="text-align:right">
+          <small id="paletteCount" style="color:var(--muted)">0 swatches</small>
+        </div>
+      </div>
+
+      <div class="palette" id="palette"></div>
+
+      <div class="actions">
+        <button id="copyCss" class="btn-ghost">Copy CSS vars</button>
+        <button id="downloadJson">Download JSON</button>
+      </div>
+
+      <div class="note" id="status">Ready.</div>
+    </aside>
+  </div>
+
+  <canvas id="work" style="display:none"></canvas>
+
+<script>
+/*
+ Simple color quantization by bucketting pixels.
+ Steps:
+ 1. Draw image to canvas
+ 2. Sample pixel data (optionally downsample)
+ 3. Reduce color precision (shift) to group similar colors
+ 4. Count frequency per bucket, compute average color per bucket
+ 5. Sort by frequency and return top N colors
+*/
+
+const fileInput = document.getElementById('file');
+const dropzone = document.getElementById('dropzone');
+const previewImg = document.getElementById('previewImg');
+const canvas = document.getElementById('work');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const countRange = document.getElementById('count');
+const countVal = document.getElementById('countVal');
+const extractBtn = document.getElementById('extract');
+const paletteEl = document.getElementById('palette');
+const status = document.getElementById('status');
+const paletteCount = document.getElementById('paletteCount');
+const clearBtn = document.getElementById('clear');
+const copyCssBtn = document.getElementById('copyCss');
+const downloadJsonBtn = document.getElementById('downloadJson');
+
+let loadedImage = null;
+let lastPalette = [];
+
+countRange.addEventListener('input', () => countVal.textContent = countRange.value);
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('keydown', (e) => { if(e.key==='Enter' || e.key===' ') fileInput.click(); });
+
+fileInput.addEventListener('change', (e) => {
+  if(e.target.files && e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+['dragenter','dragover'].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.style.opacity=0.9; })
+);
+['dragleave','drop','dragend'].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.style.opacity=1; })
+);
+
+dropzone.addEventListener('drop', (e) => {
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) loadFile(f);
+});
+
+clearBtn.addEventListener('click', clearAll);
+extractBtn.addEventListener('click', () => {
+  if(!loadedImage){ status.textContent = 'Load an image first.'; return; }
+  status.textContent = 'Extracting colors...';
+  setTimeout(() => { // keep UI responsive
+    const palette = extractPalette(loadedImage, parseInt(countRange.value,10));
+    lastPalette = palette;
+    renderPalette(palette);
+    status.textContent = 'Done.';
+  }, 10);
+});
+
+copyCssBtn.addEventListener('click', () => {
+  if(!lastPalette.length){ status.textContent = 'No palette to copy.'; return; }
+  const css = paletteToCssVars(lastPalette);
+  navigator.clipboard.writeText(css)
+    .then(()=> status.textContent = 'CSS variables copied to clipboard.')
+    .catch(()=> status.textContent = 'Copy failed.');
+});
+
+downloadJsonBtn.addEventListener('click', () => {
+  if(!lastPalette.length){ status.textContent = 'No palette to download.'; return; }
+  const data = JSON.stringify(lastPalette, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'palette.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  status.textContent = 'Palette JSON downloaded.';
+});
+
+function loadFile(file){
+  if(!file.type.startsWith('image/')){ status.textContent = 'Not an image file.'; return; }
+  if(file.size > 10 * 1024 * 1024){ status.textContent = 'File too large (>10MB).'; return; }
+
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    loadedImage = img;
+    previewImg.src = url;
+    previewImg.style.display = 'block';
+    document.getElementById('info').textContent = `${img.width} × ${img.height} — ${Math.round(file.size/1024)} KB`;
+    status.textContent = 'Image loaded. Click Extract.';
+    URL.revokeObjectURL(url);
+  };
+  img.onerror = () => { status.textContent = 'Could not load image.'; URL.revokeObjectURL(url); };
+  img.src = url;
+}
+
+function clearAll(){
+  loadedImage = null;
+  previewImg.src = '';
+  previewImg.style.display = 'none';
+  paletteEl.innerHTML = '';
+  lastPalette = [];
+  document.getElementById('info').textContent = 'No image loaded';
+  status.textContent = 'Cleared.';
+  paletteCount.textContent = '0 swatches';
+}
+
+// color helpers
+function rgbToHex(r,g,b){
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+function hexToRgb(hex){
+  hex=hex.replace('#','');
+  return [parseInt(hex.slice(0,2),16), parseInt(hex.slice(2,4),16), parseInt(hex.slice(4,6),16)];
+}
+
+// main quantizer
+function extractPalette(img, count){
+  // scale large images down to keep CPU low while preserving visual variety
+  const maxSide = 800;
+  let w = img.width, h = img.height;
+  if(Math.max(w,h) > maxSide){
+    const ratio = maxSide / Math.max(w,h);
+    w = Math.round(w * ratio);
+    h = Math.round(h * ratio);
+  }
+  canvas.width = w;
+  canvas.height = h;
+  ctx.clearRect(0,0,w,h);
+  ctx.drawImage(img, 0, 0, w, h);
+
+  // sample every nth pixel depending on image size
+  const step = Math.max(1, Math.floor(Math.max(w,h) / 300)); // ~90k to 300k samples max
+  const imgData = ctx.getImageData(0,0,w,h).data;
+
+  // bucket colors by reduced precision
+  // shift -> number of bits we drop for each color channel (0..8).
+  // larger shift = more aggressive grouping. We can adjust based on count.
+  // heuristic: more target colors -> finer buckets
+  const shift = count <= 4 ? 3 : count <= 8 ? 2 : 1; // 3->big buckets, 1->finer
+  const buckets = new Map(); // key -> {count, rsum, gsum, bsum}
+  for(let y=0; y<h; y+=step){
+    for(let x=0; x<w; x+=step){
+      const idx = (y * w + x) * 4;
+      const r = imgData[idx], g = imgData[idx+1], b = imgData[idx+2], a = imgData[idx+3];
+      if(a < 125) continue; // skip transparent-ish
+      // ignore near-white/near-black? No — keep them
+      const key = ((r >> shift) << 16) | ((g >> shift) << 8) | (b >> shift);
+      const existing = buckets.get(key);
+      if(existing){
+        existing.count++;
+        existing.rsum += r;
+        existing.gsum += g;
+        existing.bsum += b;
+      } else {
+        buckets.set(key, {count:1, rsum:r, gsum:g, bsum:b});
+      }
+    }
+  }
+
+  // convert buckets to averaged colors
+  const arr = [];
+  buckets.forEach((v,k) => {
+    const avgR = Math.round(v.rsum / v.count);
+    const avgG = Math.round(v.gsum / v.count);
+    const avgB = Math.round(v.bsum / v.count);
+    arr.push({count: v.count, r:avgR, g:avgG, b:avgB});
+  });
+
+  // sort by count (descending)
+  arr.sort((a,b)=> b.count - a.count);
+
+  // pick top N, but also try to ensure variety by skipping extremely similar ones
+  const selected = [];
+  const used = [];
+  for(const item of arr){
+    if(selected.length >= count) break;
+    const hex = rgbToHex(item.r,item.g,item.b);
+    // check distance to already selected
+    let ok = true;
+    for(const s of used){
+      const d = colorDistance([s.r,s.g,s.b],[item.r,item.g,item.b]);
+      if(d < 32) { ok = false; break; } // too similar
+    }
+    if(ok){
+      selected.push({hex, r:item.r, g:item.g, b:item.b, count:item.count});
+      used.push(item);
+    } else {
+      // if we are near the end and haven't filled, allow similar colors
+      if(arr.indexOf(item) > arr.length - 30 && selected.length < count){
+        selected.push({hex, r:item.r, g:item.g, b:item.b, count:item.count});
+        used.push(item);
+      }
+    }
+  }
+
+  // if still not enough (rare), add top colors
+  if(selected.length < count){
+    for(const item of arr){
+      const hex = rgbToHex(item.r,item.g,item.b);
+      if(!selected.find(s=>s.hex===hex)){
+        selected.push({hex, r:item.r, g:item.g, b:item.b, count:item.count});
+        if(selected.length >= count) break;
+      }
+    }
+  }
+
+  return selected.slice(0, count);
+}
+
+function colorDistance(a,b){
+  // simple Euclidean distance in RGB
+  const dr = a[0]-b[0], dg = a[1]-b[1], db = a[2]-b[2];
+  return Math.sqrt(dr*dr + dg*dg + db*db);
+}
+
+function renderPalette(palette){
+  paletteEl.innerHTML = '';
+  paletteCount.textContent = `${palette.length} swatches`;
+  palette.forEach((p, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'swatch';
+    sw.style.background = p.hex;
+    // set text color based on luminance
+    const lum = (0.299*p.r + 0.587*p.g + 0.114*p.b);
+    sw.style.color = lum > 160 ? 'rgba(0,0,0,0.8)' : '#fff';
+
+    const label = document.createElement('div');
+    label.innerHTML = `<div style="font-size:13px">${p.hex}</div><small>#{${i+1}}</small>`;
+    sw.appendChild(label);
+
+    sw.addEventListener('click', async ()=>{
+      try {
+        await navigator.clipboard.writeText(p.hex);
+        status.textContent = `${p.hex} copied to clipboard.`;
+      } catch(e){ status.textContent = `Copy failed.`; }
+    });
+
+    sw.addEventListener('contextmenu', (e)=>{ // right-click: copy rgb
+      e.preventDefault();
+      const rgb = `rgb(${p.r}, ${p.g}, ${p.b})`;
+      navigator.clipboard.writeText(rgb).then(()=> status.textContent = `${rgb} copied.`);
+    });
+
+    paletteEl.appendChild(sw);
+  });
+}
+
+// generate CSS variables like --c-1: #AABBCC;
+function paletteToCssVars(palette){
+  let lines = ':root {';
+  palette.forEach((p,i)=>{
+    lines += `\n  --c-${i+1}: ${p.hex};`;
+  });
+  lines += '\n}\n';
+  return lines;
+}
+
+// ---- keyboard shortcut: E to extract, C to clear
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='e' || e.key==='E') extractBtn.click();
+  if(e.key==='c' || e.key==='C') clearBtn.click();
+});
+
+// initial note
+status.textContent = 'Ready. Drop an image or click the box.';
+
+// expose helper for debugging (optional)
+window._extractPalette = extractPalette;
+</script>
+</body>
+</html>
